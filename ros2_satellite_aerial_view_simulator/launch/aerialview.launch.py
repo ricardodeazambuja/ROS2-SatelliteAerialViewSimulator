@@ -32,12 +32,44 @@ def generate_launch_description():
       default_value='100.0'
    )
 
+   rgb_topic = LaunchConfiguration('rgb_topic')
+   rgb_topic_arg = DeclareLaunchArgument(
+      'rgb_topic',
+      default_value='/carla/flying_sensor/rgb_down/image'
+   )
+
+   depth_topic = LaunchConfiguration('depth_topic')
+   depth_topic_arg = DeclareLaunchArgument(
+      'depth_topic',
+      default_value='/carla/flying_sensor/depth_down/image'
+   )
+
+   twist_topic = LaunchConfiguration('twist_topic')
+   twist_topic_arg = DeclareLaunchArgument(
+      'twist_topic',
+      default_value='/quadctrl/flying_sensor/ctrl_twist_sp'
+   )
+
+   baseurl = LaunchConfiguration('baseurl')
+   baseurl_arg = DeclareLaunchArgument(
+      'baseurl',
+      default_value='https://wxs.ign.fr/choisirgeoportail/geoportail/wmts?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&FORMAT=image/jpeg&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}'
+   )
+
    aerialimages = Node(
          package='ros2_satellite_aerial_view_simulator',
          executable='aerialimages_publisher',
          name='aerialimages_module',
          # emulate_tty=True,
-         parameters=[{'lat':lat}, {'lon':lon}, {'z_init':z_init}]
+         parameters=[
+            {'lat':lat}, 
+            {'lon':lon}, 
+            {'z_init':z_init},
+            {'rgb_topic':rgb_topic},
+            {'depth_topic':depth_topic},
+            {'twist_topic':twist_topic},
+            {'baseurl':baseurl},
+            ]
       )
 
    return LaunchDescription([
@@ -45,5 +77,9 @@ def generate_launch_description():
       lat_arg,
       lon_arg,
       z_init_arg,
+      rgb_topic_arg,
+      depth_topic_arg,
+      twist_topic_arg,
+      baseurl_arg,
       aerialimages
    ])
