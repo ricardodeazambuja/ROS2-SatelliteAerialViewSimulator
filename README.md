@@ -21,3 +21,5 @@ By default it will publish:
 The topics are all parameters, check the [launch file](src/ros2_satellite_aerial_view_simulator/ros2_satellite_aerial_view_simulator/launch/aerialview.launch.py) and the parameters in the [main script](src/ros2_satellite_aerial_view_simulator/ros2_satellite_aerial_view_simulator/ros2_satellite_aerial_view_simulator/aerialimages.py).
 
 Tested only using my own docker image running ROS 2 Galactic (`ricardodeazambuja/ros2_quad_sim_python`).
+
+![image](https://github.com/ricardodeazambuja/ros2_satellite_aerial_view_simulator/assets/6606382/1cc3f68c-ebb5-4ec5-9289-b51732fbcafb)
