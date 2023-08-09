@@ -15,7 +15,7 @@ ROS 2 wrapper node for https://github.com/ricardodeazambuja/AerialViewGenerator
 
 By default it will publish:
 * the coordinate frames (tf) between `map` and `flying_sensor`
-* RGB image as if it was from a camera pointing downwards (`/carla/flying_sensor/rgb_down/image`)
+* RGB image as if it was from a camera mounted on a gimbal that always points downwards (`/carla/flying_sensor/rgb_down/image`)
 * fake depth image (constant value) just because I needed it for my own stuff (`/carla/flying_sensor/depth_down/image`)
 
 The topics are all parameters, check the [launch file](src/ros2_satellite_aerial_view_simulator/ros2_satellite_aerial_view_simulator/launch/aerialview.launch.py) and the parameters in the [main script](src/ros2_satellite_aerial_view_simulator/ros2_satellite_aerial_view_simulator/ros2_satellite_aerial_view_simulator/aerialimages.py).
