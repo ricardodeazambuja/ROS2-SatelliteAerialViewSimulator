@@ -25,6 +25,7 @@ class AerialImagesPublisher(Node):
         
         self.declare_parameter('rgb_topic', '/carla/flying_sensor/rgb_down/image')
         self.declare_parameter('depth_topic', '/carla/flying_sensor/depth_down/image')
+        self.declare_parameter('twist_topic', '/quadctrl/flying_sensor/ctrl_twist_sp')
         self.declare_parameter('delta_t', 0.02)
         self.declare_parameter('output_size', 352)
         self.declare_parameter('baseurl', 'https://wxs.ign.fr/choisirgeoportail/geoportail/wmts?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&FORMAT=image/jpeg&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}')
@@ -33,8 +34,13 @@ class AerialImagesPublisher(Node):
         self.declare_parameter('bearing', 0.0)
         self.declare_parameter('fov', 73.0)
         self.declare_parameter('z_init', 100.0)
+        self.declare_parameter('fake_depth_size', (100, 100))
+        self.declare_parameter('fake_depth_value', 100)
+        self.declare_parameter('parent_frame', "map")
+        self.declare_parameter('child_frame', "flying_sensor")
         rgb_topic = self.get_parameter('rgb_topic').value
         depth_topic = self.get_parameter('depth_topic').value
+        twist_topic = self.get_parameter('twist_topic').value
         self.delta_t = self.get_parameter('delta_t').value
         output_size = self.get_parameter('output_size').value
         self.output_img_size = (output_size, output_size)
@@ -44,9 +50,56 @@ class AerialImagesPublisher(Node):
         self.bearing = self.get_parameter('bearing').value
         self.fov = self.get_parameter('fov').value
         z_init = self.get_parameter('z_init').value
+        fake_depth_size = self.get_parameter('fake_depth_size').value
+        fake_depth_value = self.get_parameter('fake_depth_value').value
+        self.parent_frame = self.get_parameter('parent_frame').value
+        self.child_frame = self.get_parameter('child_frame').value
+
+
+        ctrl_params = {
+                      # Position P gains
+                      "Px"    : 1.0, "Py"    : 1.0, "Pz"    : 1.0,
+
+                      # Velocity P-D gains
+                      "Pxdot" : 5.0, "Dxdot" : 0.5, "Ixdot" : 5.0,
+
+                      "Pydot" : 5.0, "Dydot" : 0.5, "Iydot" : 5.0,
+
+                      "Pzdot" : 4.0, "Dzdot" : 0.5, "Izdot" : 5.0,
+
+                      # Attitude P gains
+                      "Pphi"   : 8.0, "Ptheta" : 8.0, "Ppsi"   : 1.5,
+
+                      # Rate P-D gains
+                      "Pp" : 1.5, "Dp" : 0.04,
+
+                      "Pq" : 1.5, "Dq" : 0.04,
+
+                      "Pr" : 1.0, "Dr" : 0.1,
+
+                      # Max Velocities (x,y,z) [m/s]
+                      "uMax" : 15.0, "vMax" : 15.0, "wMax" : 5.0,
+
+                      "saturateVel_separately" : True,
+
+                      # Max tilt [degrees]
+                      "tiltMax" : 50.0,
+
+                      # Max Rate [degrees/s]
+                      "pMax" : 200.0, "qMax" : 200.0, "rMax" : 150.0,
+
+                      # Minimum velocity for yaw follow to kick in [m/s]
+                      "minTotalVel_YawFollow" : 0.1,
+
+                      "useIntegral" : True    # Include integral gains in linear velocity control
+                      }
+        
+        for k,v in ctrl_params.copy().items():
+            self.declare_parameter(k, v)
+            ctrl_params[k] = self.get_parameter(k).value
         
         self.avg = AerialView(zoom=20, baseurl=baseurl)
-        self.uav = UAVPhysics(z0=z_init, ctrlType="xyz_vel", ctrlParams={"Px":1, "Py":1, "Pz":1, "uMax" : 15.0, "vMax" : 15.0, "wMax" : 5.0})
+        self.uav = UAVPhysics(z0=z_init, ctrlType="xyz_vel", ctrlParams=ctrl_params)
         self.twist_linear = [0.0,0.0,0.0]
         self.currPos = [0.0,0.0,z_init]
         self.currLatLon = [lat0, lon0]
@@ -56,18 +109,19 @@ class AerialImagesPublisher(Node):
         self.rgb_pub = self.create_publisher(ImageMsg, rgb_topic,1)
         self.depth_pub = self.create_publisher(ImageMsg, depth_topic,1)
 
-        self.fake_depth = self.cv_bridge.cv2_to_imgmsg(np.ones((100,100), dtype="float32")*100, encoding='passthrough')
-        self.fake_depth.header.frame_id = "flying_sensor"
+        self.fake_depth = self.cv_bridge.cv2_to_imgmsg(np.ones(fake_depth_size, dtype="float32")*fake_depth_value, encoding='passthrough')
+        self.fake_depth.header.frame_id = self.child_frame
 
         self.tf_broadcaster = TransformBroadcaster(self)
 
         self.receive_control_twist = self.create_subscription(
             Twist,
-            f"/quadctrl/flying_sensor/ctrl_twist_sp",
+            twist_topic,
             self.receive_control_twist_cb,
             1)
 
         self.img_timer = self.create_timer(self.delta_t, self.on_img_timer)
+ 
 
     def on_img_timer(self):
         nextPos = np.asarray(self.uav.update([0]*3, self.twist_linear, self.delta_t))
@@ -84,12 +138,12 @@ class AerialImagesPublisher(Node):
         img_np = np.asarray(img.convert('RGB'))
 
         img_msg = self.cv_bridge.cv2_to_imgmsg(img_np, encoding='rgb8')
-        img_msg.header.frame_id = "flying_sensor"
+        img_msg.header.frame_id = self.child_frame
 
         self.rgb_pub.publish(img_msg)
         self.depth_pub.publish(self.fake_depth)
 
-        self.publish_transform(*self.currPos)
+        self.publish_transform(*self.currPos, parent=self.parent_frame, child=self.child_frame)
         self.get_logger().info(f'Current position: {-self.currPos[1],-self.currPos[0],self.currPos[2]}')
         self.get_logger().info(f'Current lat/lon: {lat, lon}')
 
