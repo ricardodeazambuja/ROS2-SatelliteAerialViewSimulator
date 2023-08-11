@@ -139,7 +139,8 @@ class AerialImagesPublisher(Node):
 
         img_msg = self.cv_bridge.cv2_to_imgmsg(img_np, encoding='rgb8')
         img_msg.header.frame_id = self.child_frame
-
+        img_msg.header.stamp = self.get_clock().now().to_msg()
+        self.fake_depth.header.stamp = img_msg.header.stamp
         self.rgb_pub.publish(img_msg)
         self.depth_pub.publish(self.fake_depth)
 
